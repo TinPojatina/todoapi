@@ -1,0 +1,15 @@
+spring:
+  datasource:
+    # These properties will be overridden by Testcontainers during actual test run
+    url: jdbc:postgresql://localhost:5432/test
+    username: postgres
+    password: postgres
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+
+  security:
+    jwt:
+      secret: TestSecretKey12345678901234567890ABCDEFGHIJKL
+      expiration: 86400000

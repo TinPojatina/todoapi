@@ -8,6 +8,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class WebSocketMessage {
-    private com.kanban.websocket.WebSocketMessageType type;
-    private Object payload;
+  private WebSocketMessageType type;
+  private Object payload;
 }

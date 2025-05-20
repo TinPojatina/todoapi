@@ -1,10 +1,15 @@
 package todo.kanban.security;
 
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
+import java.security.Key;
+import java.util.Date;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -13,66 +18,87 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import todo.kanban.service.UserDetailsServiceImpl;
 
-import java.security.Key;
-import java.util.Date;
-
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class JwtUtils {
 
-    private final UserDetailsServiceImpl userDetailsService;
+  private final UserDetailsServiceImpl userDetailsService;
 
-    @Value("${spring.security.jwt.secret}")
-    private String jwtSecret;
+  @Value("${spring.security.jwt.secret:LongSecureRandomSecretForJWTAuthentication2025}")
+  private String jwtSecret;
 
-    @Value("${spring.security.jwt.expiration}")
-    private long jwtExpirationMs;
+  @Value("${spring.security.jwt.expiration:86400000}")
+  private long jwtExpirationMs;
 
-    public String generateToken(String username) {
-        Date now = new Date();
-        Date expiryDate = new Date(now.getTime() + jwtExpirationMs);
+  private Key signingKey;
 
-        return Jwts.builder()
-                .setSubject(username)
-                .setIssuedAt(now)
-                .setExpiration(expiryDate)
-                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
-                .compact();
+  @PostConstruct
+  public void init() {
+    // Initialize signing key once at startup
+    signingKey = Keys.hmacShaKeyFor(jwtSecret.getBytes());
+    log.info("JWT signing key initialized");
+  }
+
+  public String generateToken(String username) {
+    log.info("Generating JWT token for user: {}", username);
+    Date now = new Date();
+    Date expiryDate = new Date(now.getTime() + jwtExpirationMs);
+
+    String token =
+        Jwts.builder()
+            .setSubject(username)
+            .setIssuedAt(now)
+            .setExpiration(expiryDate)
+            .signWith(signingKey, SignatureAlgorithm.HS256)
+            .compact();
+
+    log.info("JWT token generated with expiration: {}", expiryDate);
+    return token;
+  }
+
+  public String getUsernameFromToken(String token) {
+    try {
+      Claims claims =
+          Jwts.parserBuilder().setSigningKey(signingKey).build().parseClaimsJws(token).getBody();
+
+      String username = claims.getSubject();
+      log.debug("Username extracted from token: {}", username);
+      return username;
+    } catch (Exception e) {
+      log.error("Could not extract username from token", e);
+      return null;
     }
+  }
 
-    public String getUsernameFromToken(String token) {
-        return Jwts.parserBuilder()
-                .setSigningKey(getSigningKey())
-                .build()
-                .parseClaimsJws(token)
-                .getBody()
-                .getSubject();
-    }
+  public boolean validateToken(String token) {
+    try {
+      Jwts.parserBuilder().setSigningKey(signingKey).build().parseClaimsJws(token);
 
-    public boolean validateToken(String token) {
-        try {
-            Jwts.parserBuilder().setSigningKey(getSigningKey()).build().parseClaimsJws(token);
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
+      log.debug("Token validated successfully");
+      return true;
+    } catch (Exception e) {
+      log.error("Token validation failed", e);
+      return false;
     }
+  }
 
-    public Authentication getAuthentication(String token) {
-        UserDetails userDetails = userDetailsService.loadUserByUsername(getUsernameFromToken(token));
-        return new UsernamePasswordAuthenticationToken(userDetails, "", userDetails.getAuthorities());
-    }
+  public Authentication getAuthentication(String token) {
+    log.debug("Getting authentication for token");
+    UserDetails userDetails = userDetailsService.loadUserByUsername(getUsernameFromToken(token));
+    log.debug("User details loaded for: {}", userDetails.getUsername());
+    return new UsernamePasswordAuthenticationToken(userDetails, "", userDetails.getAuthorities());
+  }
 
-    public String resolveToken(HttpServletRequest request) {
-        String bearerToken = request.getHeader("Authorization");
-        if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {
-            return bearerToken.substring(7);
-        }
-        return null;
+  public String resolveToken(HttpServletRequest request) {
+    String bearerToken = request.getHeader("Authorization");
+    if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {
+      String token = bearerToken.substring(7);
+      log.debug(
+          "Token resolved from request: {}",
+          token.substring(0, Math.min(10, token.length())) + "...");
+      return token;
     }
-
-    private Key getSigningKey() {
-        byte[] keyBytes = jwtSecret.getBytes();
-        return Keys.hmacShaKeyFor(keyBytes);
-    }
+    return null;
+  }
 }

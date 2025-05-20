@@ -14,7 +14,7 @@ A Spring Boot backend for a Kanban board application with REST API, WebSocket no
 
 ## Tech Stack
 
-- Java 17
+- Java 21
 - Spring Boot 3.1.3
 - Spring Data JPA
 - Spring Security (JWT)

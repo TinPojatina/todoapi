@@ -1,5 +1,7 @@
 package todo.kanban.model;
 
 public enum TaskPriority {
-    LOW, MED, HIGH
+  LOW,
+  MED,
+  HIGH
 }

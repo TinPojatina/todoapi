@@ -1,6 +1,10 @@
-version: '3.8'
-
 services:
+  flyway-repair:
+    image: flyway/flyway:10-alpine
+    command: -url=jdbc:postgresql://db:5432/kanban -user=kanban -password=kanban repair
+    depends_on:
+      db:
+        condition: service_healthy
   app:
     build: .
     ports:

@@ -1,37 +1,76 @@
 server:
   port: 8080
+  servlet:
+    context-path: /
+  error:
+    include-message: always
+    include-binding-errors: always
 
 spring:
   application:
     name: kanban-api
-
+  graphql:
+    graphiql:
+      enabled: true
+      path: /graphiql
+    path: /graphql
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:kanban}
     username: ${DB_USER:kanban}
     password: ${DB_PASSWORD:kanban}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      connection-timeout: 30000
+      maximum-pool-size: 10
+      minimum-idle: 5
+      pool-name: KanbanHikariCP
 
   jpa:
     hibernate:
       ddl-auto: validate
-    show-sql: false
+    show-sql: true
     properties:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
+        jdbc:
+          time_zone: UTC
 
   flyway:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: true
+    validate-on-migrate: true
 
   jackson:
     serialization:
       write-dates-as-timestamps: false
+      fail-on-empty-beans: false
+    deserialization:
+      fail-on-unknown-properties: false
+    default-property-inclusion: non_null
+
+  cache:
+    type: caffeine
+    cache-names: tasks,tasksList
+    caffeine:
+      spec: initialCapacity=100,maximumSize=500,expireAfterAccess=600s
+
+  web:
+    resources:
+      add-mappings: false
+  data:
+    web:
+      pageable:
+        default-page-size: 10
+        max-page-size: 100
+        one-indexed-parameters: false
+        page-parameter: page
+        size-parameter: size
 
   security:
     jwt:
-      secret: ${JWT_SECRET:ASecure32CharacterSecretKeyForJWTs}
+      secret: ${JWT_SECRET:LongSecureRandomSecretForJWTAuthentication2025}
       expiration: ${JWT_EXPIRATION:86400000} # 24 hours in milliseconds
 
 springdoc:
@@ -40,12 +79,33 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
     disable-swagger-default-url: true
+    operations-sorter: method
+    tags-sorter: alpha
+    doc-expansion: none
+  cache:
+    disabled: true
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,prometheus
+        include: health,info,prometheus,metrics,caches
   endpoint:
     health:
       show-details: always
+    caches:
+      access: read_only
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+
+logging:
+  level:
+    root: INFO
+    todo.kanban: DEBUG
+    org.springframework.web: INFO
+    org.springframework.security: INFO
+    org.springframework.data: INFO
+    org.springframework.cache: DEBUG
+    org.hibernate.SQL: DEBUG

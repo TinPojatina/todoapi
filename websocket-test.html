@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>WebSocket Test</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.5.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+</head>
+<body>
+<h1>WebSocket Test</h1>
+<div>
+    <button id="connect">Connect</button>
+    <button id="disconnect" disabled>Disconnect</button>
+</div>
+<div id="messages" style="margin-top: 20px;"></div>
+
+<script>
+    let stompClient = null;
+    const token = prompt("Enter your JWT token");
+
+    document.getElementById('connect').addEventListener('click', function() {
+        const socket = new SockJS('http://localhost:8080/ws');
+        stompClient = Stomp.over(socket);
+
+        stompClient.connect({Authorization: 'Bearer ' + token}, function(frame) {
+            console.log('Connected: ' + frame);
+            document.getElementById('connect').disabled = true;
+            document.getElementById('disconnect').disabled = false;
+
+            stompClient.subscribe('/topic/tasks', function(message) {
+                const messageBody = JSON.parse(message.body);
+                displayMessage(messageBody);
+            });
+        });
+    });
+
+    document.getElementById('disconnect').addEventListener('click', function() {
+        if (stompClient !== null) {
+            stompClient.disconnect();
+            stompClient = null;
+            document.getElementById('connect').disabled = false;
+            document.getElementById('disconnect').disabled = true;
+
+            document.getElementById('messages').innerHTML += '<p>Disconnected</p>';
+        }
+    });
+
+    function displayMessage(message) {
+        const messageElement = document.createElement('div');
+        messageElement.style.marginBottom = '10px';
+        messageElement.style.padding = '10px';
+        messageElement.style.border = '1px solid #ccc';
+
+        let messageType;
+        switch(message.type) {
+            case 'CREATED':
+                messageType = 'Task Created';
+                messageElement.style.backgroundColor = '#e6ffe6';
+                break;
+            case 'UPDATED':
+                messageType = 'Task Updated';
+                messageElement.style.backgroundColor = '#e6f2ff';
+                break;
+            case 'DELETED':
+                messageType = 'Task Deleted';
+                messageElement.style.backgroundColor = '#ffe6e6';
+                break;
+            default: messageType = message.type;
+        }
+
+        messageElement.innerHTML = `
+                <h3>${messageType}</h3>
+                <pre>${JSON.stringify(message.payload, null, 2)}</pre>
+                <small>${new Date().toLocaleTimeString()}</small>
+            `;
+
+        document.getElementById('messages').prepend(messageElement);
+    }
+</script>
+</body>
+</html>
